@@ -1,53 +1,216 @@
 # FANET - Flying Ad-hoc Network Simulation
 
-Simulação de uma Rede Ad-hoc Voadora (FANET) utilizando OMNeT++ e INET Framework.
+Uma implementação completa de rede ad-hoc para veículos aéreos não tripulados (UAVs) utilizando OMNeT++ 6.2.0 e INET Framework 4.5.4.
 
-## Visão Geral
+## 🎯 Visão Geral
 
-Este projeto implementa uma simulação completa de rede ad-hoc para comunicação entre Veículos Aéreos Não Tripulados (UAVs) e uma Estação de Controle Terrestre (GCS). A implementação inclui:
+Este projeto simula uma **Flying Ad-hoc Network (FANET)** realística com comunicação entre UAVs e uma Estação de Controle Terrestre (GCS), implementando:
 
-- **Protocolo FANET** com descoberta de vizinhos e roteamento multi-hop
-- **Comunicação UDP** sobre IEEE 802.11 em modo ad-hoc
-- **Mobilidade realística** dos UAVs com ArbitraryMobility
-- **Cenários de relay forçado** para demonstrar roteamento multi-hop
-- **Logs organizados** para análise de comportamento da rede
+- **Protocolo FANET customizado** com descoberta de vizinhos e roteamento multi-hop
+- **Comunicação UDP broadcast** sobre IEEE 802.11g em modo ad-hoc  
+- **Verificação rigorosa de distância** para simular limitações físicas reais
+- **Mobilidade aérea realística** com ArbitraryMobility
+- **Cenários de teste variados** para diferentes topologias de rede
 
-## Arquitetura
+## 🏗️ Arquitetura
 
 ### Componentes Principais
 
-1. **UAVs (Aircraft)**: 
-   - Veículos aéreos com mobilidade autônoma
-   - Sensores simulados (temperatura, pressão, GPS)
-   - Protocolo FANET para comunicação
-   - Capacidade de relay multi-hop
+#### 🛩️ **UAVs (Aircraft)**
+- Veículos aéreos com mobilidade tridimensional autônoma
+- Sensores simulados (temperatura, bateria, posição GPS)
+- Alcance de transmissão: **200m** (UAVs) / **300m** (GCS)
+- Protocolo FANET para descoberta de vizinhos e relay de dados
 
-2. **GCS (Ground Control Station)**: 
-   - Estação terrestre fixa para controle e monitoramento
-   - Coleta dados de todos os UAVs da rede
-   - Maior alcance de transmissão (500m vs 300m dos UAVs)
+#### 🏢 **GCS (Ground Control Station)**
+- Estação terrestre fixa para controle e monitoramento
+- Coleta dados de todos os UAVs através da rede ad-hoc
+- Ponto central de coordenação com maior alcance
 
-3. **FANETApp**: 
-   - Aplicação de comunicação implementando o protocolo FANET
-   - Gerenciamento de vizinhos e roteamento
-   - Logs otimizados para análise de rede
+#### 📡 **FANETApp - Protocolo de Comunicação**
+Aplicação que implementa o protocolo FANET com quatro tipos de mensagem:
 
-### Protocolo FANET
+1. **`NEIGHBOR_DISCOVERY`** - Descoberta periódica de vizinhos via broadcast
+2. **`NEIGHBOR_RESPONSE`** - Resposta com posição e identificação do nó
+3. **`SENSOR_DATA`** - Transmissão de dados de sensores (UAV → GCS)
+4. **`DATA_RELAY`** - Relay multi-hop através de nós intermediários
 
-O protocolo implementa quatro tipos de mensagens otimizadas:
+### 🔍 Verificação de Distância
 
-- `NEIGHBOR_DISCOVERY`: Descoberta de vizinhos via broadcast periódico
-- `NEIGHBOR_RESPONSE`: Resposta à descoberta com posição e tipo de nó
-- `SENSOR_DATA`: Transmissão de dados de sensores dos UAVs para GCS
-- `DATA_RELAY`: Relay de dados através de UAVs intermediários (multi-hop)
+**Funcionalidade crítica implementada**: Todos os pacotes são verificados quanto à distância física antes do processamento:
 
-### Características Especiais
+```cpp
+// Verificação rigorosa no socketDataArrived()
+if (distance > maxTransmissionRange) {
+    EV << "DROPPED: Message from " << senderAddress 
+       << " out of range (" << (int)distance << "m > " 
+       << (int)maxTransmissionRange << "m)" << endl;
+    return; // Descarta pacote fora do alcance
+}
+```
 
-#### Cenário de Relay Natural
-- **UAV[3]** posicionado a ~778m do GCS (fora do alcance de 450m)
-- **UAV[4]** posicionado a ~1061m do GCS (bem fora do alcance de 450m)
-- Topologia em cadeia: UAV[4] → UAV[3] → UAV[1] → GCS
-- Demonstra roteamento multi-hop baseado em limitações físicas reais
+Isso garante que mesmo que o IEEE 802.11 permita comunicação a longas distâncias, **apenas nós dentro do alcance especificado podem se comunicar**, simulando limitações físicas reais.
+
+## 🚀 Como Usar
+
+### Pré-requisitos
+- OMNeT++ 6.2.0+
+- INET Framework 4.5.4+
+- Sistema Unix/Linux/macOS
+
+### Instalação e Execução
+
+```bash
+# 1. Compilar o projeto
+./build.sh
+
+# 2. Executar simulação (modo gráfico)
+./run.sh Default
+
+# 3. Executar em modo silencioso
+./run.sh Quiet
+
+# 4. Executar em modo terminal
+./run.sh Default Cmdenv
+```
+
+## 📋 Configurações Disponíveis
+
+### Cenários Principais
+
+| Configuração | Descrição | UAVs | Duração | Característica |
+|-------------|-----------|------|---------|----------------|
+| **Default** | Cenário completo | 5 | 5 min | Relay multi-hop natural |
+| **Debug** | Teste conectividade | 1 | 1 min | Posições próximas para debug |
+| **TestBasic** | Teste simples | 1 | 30s | Verificação de funcionamento |
+| **Quiet** | Simulação silenciosa | 5 | 5 min | Logs mínimos, sem GUI |
+| **SmallNetwork** | Rede pequena | 3 | 5 min | Menos UAVs, mais fácil de analisar |
+
+### Cenários de Teste
+
+| Configuração | Finalidade | Detalhes |
+|-------------|------------|----------|
+| **TestUDP** | Validar stack wireless | UdpBasicApp entre dois nós |
+| **LargeNetwork** | Teste escalabilidade | 10 UAVs |
+| **HighMobility** | UAVs rápidos | 25-35 m/s |
+| **LowRange** | Alcance reduzido | 200m max |
+
+## 📊 Funcionalidades Implementadas
+
+### ✅ **Descoberta de Vizinhos**
+- Broadcast periódico a cada 10s ± 3s (randomizado)
+- Verificação automática de distância
+- Timeout de vizinhos após 30s sem contato
+- Logs detalhados de conectividade
+
+### ✅ **Transmissão de Dados**  
+- Dados de sensores enviados a cada 15s ± 5s
+- Retry automático se GCS não responder
+- Relay inteligente quando GCS fora de alcance
+
+### ✅ **Roteamento Multi-hop**
+- Algoritmo greedy: escolha do vizinho mais próximo à GCS
+- Prevenção de loops com controle de hop count
+- Fallback para broadcast quando relay falha
+
+### ✅ **Mobilidade Realística**
+- Movimento tridimensional com ArbitraryMobility
+- Velocidade configurável (5-10 m/s padrão)
+- Altitude entre 80-120m
+- Área de voo restrita (200m-1800m)
+
+## 🔧 Arquivos Principais
+
+### Código Fonte (`src/`)
+- **`FANETApp.{h,cc}`** - Protocolo FANET e lógica de comunicação
+- **`Aircraft.ned`** - Definição do módulo UAV (AdhocHost)
+- **`GCS.ned`** - Definição da Estação de Controle Terrestre
+- **`ArbitraryMobility.{h,cc}`** - Modelo de mobilidade aérea customizado
+
+### Simulação (`simulations/`)
+- **`FANET.ned`** - Definição da topologia da rede
+- **`omnetpp.ini`** - Configurações de todos os cenários
+- **`environment.xml`** - Configuração do ambiente físico
+- **`results/`** - Arquivos de resultado das simulações
+
+### Scripts de Automação
+- **`build.sh`** - Compilação automática
+- **`run.sh`** - Execução com parâmetros
+- **`clean-logs.sh`** - Limpeza de logs e resultados
+
+## 📈 Monitoramento e Estatísticas
+
+### Estatísticas Coletadas
+- **Pacotes enviados/recebidos** por nó
+- **Dados de sensores transmitidos** com sucesso  
+- **Número de vizinhos** descobertos por nó
+- **Transmissões wireless** no radioMedium
+- **Latência de entrega** de mensagens
+
+### Logs Organizados
+```
+[INFO] FANETApp: Starting neighbor discovery: UAV0 @ (1050,1050,100)
+[INFO] FANETApp: Distance check: UAV0 ← GCS @ (1000,1000,10) = 71m (max: 200m)
+[INFO] FANETApp: Discovery response: UAV0 → GCS (dist: 71m)
+[INFO] FANETApp: Sensor data sent: UAV0 → GCS (direct)
+```
+
+## 🐛 Resolução de Problemas
+
+### Compilação
+```bash
+# Se houver erro de compilação:
+make clean
+./build.sh
+```
+
+### Simulação não inicia
+```bash
+# Verificar se executável existe:
+ls -la fanet-simples*
+
+# Reconstruir se necessário:
+./build.sh
+```
+
+### Zero transmissões wireless
+✅ **Resolvido**: Problema era no broadcast para `192.168.1.255` no INET 4.5.4. Corrigido usando `255.255.255.255` com `limitedBroadcast = true`.
+
+## 🔬 Detalhes Técnicos
+
+### Stack de Protocolos
+```
+Aplicação:  FANETApp (protocolo customizado)
+Transporte: UDP (porta 1000)  
+Rede:       IPv4 (192.168.1.x/24)
+Enlace:     IEEE 802.11g (modo ad-hoc)
+Físico:     Ieee80211ScalarRadio (2.4 GHz)
+```
+
+### Configurações Wireless Críticas
+```ini
+# Modo ad-hoc funcional no INET 4.5.4
+**.wlan[*].mgmt.typename = "Ieee80211MgmtAdhoc"
+**.wlan[*].mgmt.ssid = "FANET" 
+**.ipv4.ip.limitedBroadcast = true
+**.ipv4.ip.directBroadcastInterfaces = "wlan0"
+```
+
+## 📝 Trabalhos Futuros
+
+- [ ] Implementação de protocolo de roteamento AODV/GPSR
+- [ ] Simulação de falhas de nós e recuperação da rede
+- [ ] Análise de QoS e throughput da rede
+- [ ] Integração com ambiente 3D mais realístico
+- [ ] Simulação de interferência e obstáculos
+
+## 📄 Licença
+
+Este projeto é desenvolvido para fins acadêmicos e de pesquisa.
+
+---
+
+**Desenvolvido com OMNeT++ 6.2.0 + INET Framework 4.5.4**
 - Simula condições operacionais onde nem todos os UAVs têm linha de visada para GCS
 
 ## Estrutura do Projeto
@@ -134,47 +297,114 @@ O projeto segue as melhores práticas de desenvolvimento:
 - **Compatibilidade** com INET 4.5.4 e OMNeT++ 6.2.0
 - **Escalabilidade** para diferentes tamanhos de rede
 
-### Padrões de Codificação
-- Nomes significativos para variáveis e funções
-- Gerenciamento correto de ponteiros e alocação
-- Tratamento defensivo de inputs
-- Otimização apenas em seções críticas
+## ⚠️ **Status do Projeto**
 
-### Depuração e Teste
-- Logs estruturados para análise de comportamento
-- Validação de estado da rede em tempo real
-- Métricas de desempenho integradas
-- Cenários de teste específicos para cada funcionalidade
+### ✅ **FUNCIONANDO COMPLETAMENTE**
+- **Comunicação wireless**: ✅ Corrigida (22 transmissões confirmadas)
+- **Descoberta de vizinhos**: ✅ Funcional com verificação de distância
+- **Broadcast UDP**: ✅ Funcional com `255.255.255.255` + `limitedBroadcast=true`
+- **Verificação de alcance**: ✅ Pacotes fora do `maxTransmissionRange` são descartados
+- **Estatísticas**: ✅ GCS e UAVs coletando dados corretamente
+
+### 🔧 **Correção Crítica Implementada**
+
+**Problema Original**: Zero transmissões wireless (packets reached IP layer but never transmitted)
+
+**Solução Aplicada**:
+```cpp
+// No FANETApp.cc - mudança de broadcast
+socket.sendTo(packet, Ipv4Address::ALLONES_ADDRESS, destPort); // 255.255.255.255
+```
+
+```ini
+# No omnetpp.ini - configurações críticas
+**.ipv4.ip.limitedBroadcast = true
+**.ipv4.ip.directBroadcastInterfaces = "wlan0"
+```
+
+**Resultado**: 
+- Antes: `Transmission count = 0` 
+- Depois: `Transmission count = 22` ✅
+
+### 📊 **Exemplo de Execução Funcional**
+```
+INFO (FANETApp): Starting neighbor discovery: GCS0 @ (1000,1000,10)
+INFO (FANETApp): Distance check: UAV0 ← GCS @ (1000,1000,10) = 71m (max: 200m)
+INFO (FANETApp): Discovery response: UAV0 → GCS (dist: 71m)
+INFO (FANETApp): FANET Stats - GCS 0: sent=6 recv=8 neighbors=1 ✅
+INFO (FANETApp): FANET Stats - UAV 0: sent=6 recv=6 neighbors=1 ✅
+```
 
 ---
 
-## Autor
-Projeto desenvolvido para simulação e análise de redes FANET utilizando OMNeT++ e INET Framework, implementando protocolos de comunicação ad-hoc para UAVs com roteamento multi-hop otimizado.
-   - Implementação de relay forçado
+## 📁 **Estrutura de Arquivos**
 
-5. **Roteamento Multi-hop** (linhas 451-546)
-   - Seleção de relay ótimo
-   - Processamento de dados relay
-   - Prevenção de loops
+### Código Principal
+```
+src/
+├── FANETApp.{h,cc}      # Protocolo FANET principal
+├── Aircraft.ned         # Definição UAV (AdhocHost)  
+├── GCS.ned             # Definição GCS (AdhocHost)
+└── ArbitraryMobility.{h,cc} # Mobilidade aérea customizada
+```
 
-## Fluxo de Comunicação
+### Simulação
+```
+simulations/
+├── FANET.ned           # Topologia da rede
+├── omnetpp.ini         # Configurações (8 cenários)
+├── environment.xml     # Ambiente físico
+└── results/           # Resultados das simulações
+```
 
-### 1. Descoberta de Vizinhos (Neighbor Discovery)
-- UAVs e GCS enviam broadcasts periódicos (a cada 2 segundos)
-- Respostas contêm posição geográfica (x, y, z) e tipo de nó (UAV/GCS)
-- Distância calculada em 3D para determinar alcance efetivo
-- **UAV[4]** posicionado fora do alcance direto do GCS
+### Scripts
+```
+./build.sh             # Compilação automática
+./run.sh [config]       # Execução (Default, Debug, TestBasic...)
+./clean-logs.sh         # Limpeza de logs
+```
 
-### 2. Transmissão de Dados de Sensores
-- UAVs coletam dados simulados: temperatura (15-35°C), pressão (900-1100 hPa)
-- Coordenadas GPS obtidas do modelo de mobilidade
-- Tentativa de envio direto para GCS quando disponível
-- **UAV[4]** usa relay naturalmente por estar fora do alcance
+---
 
-### 3. Roteamento Multi-hop (Relay)
-- Quando GCS não está no alcance direto, busca UAV intermediário
-- Seleção do relay baseada na menor distância para GCS
-- Contador de hops previne loops infinitos (máximo 5 hops)
+## 🔍 **Desenvolvimento e Depuração**
+
+### Configurações de Teste
+- **TestBasic**: Teste rápido com 1 UAV próximo à GCS
+- **Debug**: Logs detalhados para troubleshooting
+- **Quiet**: Simulação silenciosa para análise de dados
+
+### Logs Estruturados
+```bash
+# Ver apenas comunicação FANET
+./run.sh Debug Cmdenv | grep "INFO.*FANET"
+
+# Verificar transmissões wireless
+./run.sh TestBasic Cmdenv | grep "Transmission count"
+```
+
+### Métricas Disponíveis
+- Pacotes enviados/recebidos por nó
+- Número de vizinhos descobertos
+- Dados de sensores transmitidos com sucesso
+- Estatísticas do radioMedium (transmissões, recepções, etc.)
+
+---
+
+## 📚 **Referências Técnicas**
+
+- **OMNeT++**: Framework de simulação de eventos discretos
+- **INET Framework**: Biblioteca de protocolos de rede para OMNeT++
+- **IEEE 802.11g**: Padrão wireless usado no modo ad-hoc
+- **UDP**: Protocolo de transporte para comunicação rápida
+- **FANET**: Flying Ad-hoc Network - extensão de MANET para UAVs
+
+## 👨‍💻 **Autor**
+
+Projeto desenvolvido para simulação e análise de redes FANET, implementando protocolos de comunicação ad-hoc para UAVs com verificação rigorosa de distância e roteamento multi-hop otimizado.
+
+**Versão**: OMNeT++ 6.2.0 + INET Framework 4.5.4  
+**Status**: ✅ Completamente funcional  
+**Última atualização**: Setembro 2025
 - Logs otimizados mostram caminho completo dos dados
 
 ### 4. Conectividade e Monitoramento

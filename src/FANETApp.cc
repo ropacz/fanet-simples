@@ -5,13 +5,19 @@
  * 
  * Esta aplicação implementa um protocolo de comunicação para redes
  * ad-hoc de veículos aéreos não tripulados (UAVs) e estação de controle
- * terrestre (GCS).
+ * terrestre (GCS) com verificação rigorosa de distância.
  * 
- * Fluxo principal:
- * 1. Descoberta de vizinhos via broadcast UDP
- * 2. Transmissão de dados de sensores dos UAVs para GCS
- * 3. Relay de dados através de UAVs intermediários quando necessário
- * 4. Monitoramento contínuo de conectividade da rede
+ * Funcionalidades principais:
+ * 1. Descoberta automática de vizinhos via broadcast UDP
+ * 2. Verificação de distância física antes de processar mensagens
+ * 3. Transmissão de dados de sensores dos UAVs para GCS
+ * 4. Relay multi-hop através de UAVs intermediários quando necessário
+ * 5. Monitoramento contínuo de conectividade da rede
+ * 
+ * Correção crítica implementada:
+ * - Broadcast funcional com 255.255.255.255 + limitedBroadcast=true
+ * - Verificação de distância em socketDataArrived() impede comunicação 
+ *   além do maxTransmissionRange mesmo que o wireless permita
  */
 
 #include "FANETApp.h"

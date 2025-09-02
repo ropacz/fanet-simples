@@ -1,5 +1,0 @@
-<config>
-    <interface hosts='**' names='wlan0' address='192.168.1.x' netmask='255.255.255.0'/>
-    <route hosts='**' destination='192.168.1.0' netmask='255.255.255.0' interface='wlan0'/>
-    <route hosts='**' destination='192.168.1.255' netmask='255.255.255.255' interface='wlan0'/>
-</config>
