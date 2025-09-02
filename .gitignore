@@ -1,0 +1,87 @@
+# OMNeT++ specific files
+*.exe
+*.so
+*.dll
+*.dylib
+*.a
+*.o
+*.obj
+*_m.cc
+*_m.h
+*_sm.cc
+*_sm.h
+
+# Build directories and executables
+out/
+/fanet-simples
+/fanet-simples_dbg
+/fanet-simples.exe
+/fanet-simples_dbg.exe
+
+# OMNeT++ workspace and IDE files
+.metadata/
+.cproject
+.project
+.oppbuildspec
+.oppfeaturestate
+.nedfolders
+.nedexclusions
+.opp_env_workspace
+
+# IDE and editor files
+.vscode/
+.settings/
+*.swp
+*.swo
+*~
+
+# Simulation results and logs
+results/
+*.vec
+*.sca
+*.vci
+*.elog
+*.log
+*.out
+*.err
+
+# Temporary and cache files
+.deps/
+*.d
+*.tmp
+/Makefile.vc
+/configcache.h
+
+# OS specific files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Documentation generated files
+doc/api/
+*.pdf
+*.aux
+*.bbl
+*.blg
+*.fdb_latexmk
+*.fls
+*.synctex.gz
+*.toc
+
+# Backup files
+*.bak
+*.backup
+*~
+
+# Python bytecode (if using Python scripts)
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Custom additions (uncomment if needed)
+# /simulations/results/
+# /images/generated/
