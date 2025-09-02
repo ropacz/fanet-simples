@@ -85,3 +85,5 @@ __pycache__/
 # Custom additions (uncomment if needed)
 # /simulations/results/
 # /images/generated/
+
+.github/instructions/
