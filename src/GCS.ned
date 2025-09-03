@@ -22,13 +22,13 @@ import inet.node.inet.AdhocHost;  // MUDANÇA CRÍTICA: AdhocHost para wireless 
 module GCS extends AdhocHost  // MUDANÇA AQUI: AdhocHost em vez de StandardHost
 {
     parameters:
-        @display("i=device/antennatower_l;r=300;t=GCS;tt=Ground Control Station");
+        @display("i=device/antennatower_l;r=400");  // Removido arranjo automático
 
         // === APLICAÇÃO ===
         numApps = 1;
         app[0].typename = "FANETApp";
         app[0].isGCS = true;
-        app[0].maxTransmissionRange = 300m;   // GCS alcance ajustado para configuração atual
+        app[0].maxTransmissionRange = 400m;   // GCS alcance ajustado para configuração atual
         
         // === REDE ===
         // AdhocHost já tem configuração adequada para ad-hoc

@@ -22,13 +22,13 @@
 module Aircraft extends AdhocHost  // MUDANÇA AQUI: AdhocHost em vez de StandardHost
 {
     parameters:
-        @display("i=misc/drone;r=200;t=UAV;tt=Unmanned Aerial Vehicle");
+        @display("i=misc/drone;r=300");  // Removido arranjo automático
         
         // === APLICAÇÃO ===
         numApps = 1;
         app[0].typename = "FANETApp";
         app[0].isGCS = false;
-        app[0].maxTransmissionRange = 200m;  // Alcance ajustado para configuração atual
+        app[0].maxTransmissionRange = 300m;  // Alcance ajustado para configuração atual
         
         // === PARÂMETROS ESPECÍFICOS ===
         double uavSpeed @unit(mps) = default(20mps);

@@ -53,8 +53,8 @@ network FANET
             @display("p=1000,1000");
         }
         
-        // Veículos Aéreos Não Tripulados (posições aleatórias)
+        // Veículos Aéreos Não Tripulados (posições definidas no omnetpp.ini)
         uav[numUAVs]: Aircraft {
-            @display("p=,,ring,200,200");
+            @display("p=100,100");  // Posição default, será sobrescrita pelo omnetpp.ini
         }
 }
