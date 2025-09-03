@@ -17,6 +17,9 @@
 #include "inet/common/packet/Packet.h"
 #include "inet/common/packet/chunk/cPacketChunk.h"
 #include <sstream>
+#include <vector>   // Para std::vector
+#include <cmath>    // Para sqrt
+#include <cstdio>   // Para sprintf
 
 using namespace omnetpp;
 using namespace inet;
@@ -42,7 +45,7 @@ void FANETApp::sendRouteRequest(const L3Address& destination) {
     
     cPacket *packet = createFANETMessage(ROUTE_REQUEST);
     packet->addPar("destination") = destination.str().c_str();
-    packet->addPar("originator") = getModuleByPath("^.ipv4.ip")->par("address").stringValue();
+    packet->addPar("originator") = myAddr.str().c_str();
     packet->addPar("sequenceNumber") = sequenceNumber;
     packet->addPar("hopCount") = 0;
     packet->addPar("ttl") = MAX_TTL;
@@ -87,22 +90,27 @@ void FANETApp::sendMeshData(const std::string& data, const L3Address& destinatio
 }
 
 L3Address FANETApp::findGCSInNetwork() {
-    // Primeiro verificar vizinhos diretos
+    // 1. Prioridade máxima: verificar vizinhos diretos que são GCS
     for (const auto& neighbor : neighbors) {
         if (neighbor.second.isGCS) {
+            EV << "Direct GCS neighbor found: " << neighbor.first << endl;
             return neighbor.first;
         }
     }
     
-    // Verificar tabela de roteamento
-    for (const auto& route : routingTable) {
-        if (route.second.isValid) {
-            // Assumir que qualquer rota válida pode levar ao GCS
-            // (simplificação para o algoritmo básico)
-            return route.first;
-        }
+    // 2. Se não há GCS direto, precisamos usar roteamento mesh
+    // Procurar na tabela de roteamento por uma rota conhecida para um GCS específico
+    // Para simplificar, assumimos que existe apenas um GCS com endereço conhecido
+    // (em implementação mais robusta, seria necessário manter lista de GCS conhecidos)
+    L3Address knownGCSAddr = L3Address(Ipv4Address("192.168.1.1")); // GCS padrão
+    
+    auto routeIt = routingTable.find(knownGCSAddr);
+    if (routeIt != routingTable.end() && routeIt->second.isValid) {
+        EV << "Route to known GCS found via " << routeIt->second.nextHop << endl;
+        return knownGCSAddr;
     }
     
+    EV << "No GCS found in network (direct or routed)" << endl;
     return L3Address(); // Não encontrado
 }
 
@@ -183,7 +191,6 @@ void FANETApp::processRouteRequest(cPacket *packet, L3Address senderAddr) {
     updateRoutingTable(originator, senderAddr, hopCount + 1);
     
     // Se somos o destino, enviar RREP
-    L3Address myAddr = L3Address(getModuleByPath("^.ipv4.ip")->par("address").stringValue());
     if (destination == myAddr) {
         sendRouteReply(originator, myAddr, 0);
         return;
@@ -242,7 +249,6 @@ void FANETApp::processMeshData(cPacket *packet, L3Address senderAddr) {
     
     L3Address destination = L3Address(packet->par("destination").stringValue());
     int ttl = packet->par("ttl");
-    L3Address myAddr = L3Address(getModuleByPath("^.ipv4.ip")->par("address").stringValue());
     
     // Se somos o destino
     if (destination == myAddr) {
@@ -320,10 +326,17 @@ FANETApp::FANETApp() :
 }
 
 FANETApp::~FANETApp() {
+    // Gerenciamento seguro de timers - cancelAndDelete já verifica nullptr
     cancelAndDelete(neighborDiscoveryTimer);
     cancelAndDelete(dataTransmissionTimer);
     cancelAndDelete(connectivityCheckTimer);
     cancelAndDelete(finalizationTimer);
+    
+    // Garantir que ponteiros sejam nulos após exclusão
+    neighborDiscoveryTimer = nullptr;
+    dataTransmissionTimer = nullptr;
+    connectivityCheckTimer = nullptr;
+    finalizationTimer = nullptr;
 }
 
 void FANETApp::initialize(int stage) {
@@ -358,6 +371,10 @@ void FANETApp::initialize(int stage) {
            << " initialized with maxRange=" << maxTransmissionRange << "m" << endl;
     }
     else if (stage == INITSTAGE_APPLICATION_LAYER) {
+        // Aquisição robusta do endereço IP - no estágio correto
+        myAddr = L3AddressResolver().resolve(getParentModule()->getFullName());
+        EV << "Node address resolved: " << myAddr << endl;
+        
         configureSocket();
         scheduleInitialTimers();
     }
@@ -384,10 +401,21 @@ void FANETApp::scheduleInitialTimers() {
     // Timer de conectividade
     scheduleAt(startTime + startDelay + 8.0, connectivityCheckTimer);
     
-    // CRÍTICO: Timer de finalização forçada para evitar loops infinitos
-    scheduleAt(startTime + 45.0, finalizationTimer);
+    // CRÍTICO: Timer de finalização forçada - usar tempo fixo baseado na configuração
+    // Como Quick=30s, Default=45s, Production=120s, usar tempo dinâmico
+    double finalizationTime = 44.0;  // 1 segundo antes do limite padrão
     
-    EV << "Timers scheduled with finalization at t=" << (startTime + 45.0) << endl;
+    // Tentar obter da configuração se possível
+    const char *simTimeLimitStr = getEnvir()->getConfig()->getConfigValue("sim-time-limit");
+    if (simTimeLimitStr != nullptr) {
+        double configLimit = atof(simTimeLimitStr);
+        if (configLimit > 0) {
+            finalizationTime = configLimit - 1.0;
+        }
+    }
+    
+    scheduleAt(finalizationTime, finalizationTimer);
+    EV << "Finalization timer scheduled for t=" << finalizationTime << endl;
 }
 
 // =============================================================================
@@ -452,18 +480,27 @@ void FANETApp::handleMessageWhenUp(cMessage *msg) {
 }
 
 void FANETApp::forceFinalization() {
-    // Cancelar todos os timers pendentes
-    cancelAndDelete(neighborDiscoveryTimer);
-    cancelAndDelete(dataTransmissionTimer);
-    cancelAndDelete(connectivityCheckTimer);
+    EV << "Forced finalization initiated..." << endl;
     
-    neighborDiscoveryTimer = nullptr;
-    dataTransmissionTimer = nullptr;
-    connectivityCheckTimer = nullptr;
+    // Gerenciamento seguro de timers
+    if (neighborDiscoveryTimer && neighborDiscoveryTimer->isScheduled()) {
+        cancelAndDelete(neighborDiscoveryTimer);
+        neighborDiscoveryTimer = nullptr;
+    }
+    if (dataTransmissionTimer && dataTransmissionTimer->isScheduled()) {
+        cancelAndDelete(dataTransmissionTimer);
+        dataTransmissionTimer = nullptr;
+    }
+    if (connectivityCheckTimer && connectivityCheckTimer->isScheduled()) {
+        cancelAndDelete(connectivityCheckTimer);
+        connectivityCheckTimer = nullptr;
+    }
     
-    EV << "All timers cancelled, simulation will end naturally" << endl;
-    delete finalizationTimer;
+    // O finalizationTimer está executando agora, será deletado automaticamente
+    // Apenas garantir que o ponteiro seja nulo
     finalizationTimer = nullptr;
+    
+    EV << "All timers cancelled safely." << endl;
 }
 
 // =============================================================================
@@ -760,22 +797,22 @@ void FANETApp::processNeighborDiscovery(cPacket *packet, L3Address senderAddr) {
     myPos = mobility->getCurrentPosition();
     double distance = calculateDistance(myPos, senderPos);
     
-    if (distance <= maxTransmissionRange) {
-        updateNeighborInfo(senderAddr, senderPos, senderIsGCS);
-        
-        // Enviar resposta
-        cPacket *response = createFANETMessage(NEIGHBOR_RESPONSE);
-        addPositionInfo(response, myPos);
-        
-        Packet *responsePacket = new Packet("FANETResponse");
-        responsePacket->insertAtBack(makeShared<cPacketChunk>(response));
-        socket.sendTo(responsePacket, senderAddr, destPort);
-        
-        packetsSent++;
-        emit(packetsSentSignal, packetsSent);
-        
-        EV << "Discovery response sent to " << senderAddr << " (dist: " << (int)distance << "m)" << endl;
-    }
+    // Se chegou o pacote, significa que está ao alcance físico
+    // A verificação de alcance é feita pela camada física do INET
+    updateNeighborInfo(senderAddr, senderPos, senderIsGCS);
+    
+    // Enviar resposta
+    cPacket *response = createFANETMessage(NEIGHBOR_RESPONSE);
+    addPositionInfo(response, myPos);
+    
+    Packet *responsePacket = new Packet("FANETResponse");
+    responsePacket->insertAtBack(makeShared<cPacketChunk>(response));
+    socket.sendTo(responsePacket, senderAddr, destPort);
+    
+    packetsSent++;
+    emit(packetsSentSignal, packetsSent);
+    
+    EV << "Discovery response sent to " << senderAddr << " (dist: " << (int)distance << "m)" << endl;
 }
 
 void FANETApp::processNeighborResponse(cPacket *packet, L3Address senderAddr) {
@@ -788,10 +825,9 @@ void FANETApp::processNeighborResponse(cPacket *packet, L3Address senderAddr) {
         Coord myPos = mobility->getCurrentPosition();
         double distance = calculateDistance(myPos, senderPos);
         
-        if (distance <= maxTransmissionRange) {
-            updateNeighborInfo(senderAddr, senderPos, senderIsGCS);
-            EV << "Neighbor added: " << senderAddr << " (dist: " << (int)distance << "m)" << endl;
-        }
+        // Se chegou a resposta, significa que está ao alcance físico
+        updateNeighborInfo(senderAddr, senderPos, senderIsGCS);
+        EV << "Neighbor added: " << senderAddr << " (dist: " << (int)distance << "m)" << endl;
     }
 }
 

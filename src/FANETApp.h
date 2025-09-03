@@ -130,6 +130,7 @@ protected:
     // =============================================================================
     UdpSocket socket;
     IMobility *mobility;
+    L3Address myAddr;                                     // Endereço IP deste nó
     std::map<L3Address, NeighborInfo> neighbors;
 
     // Timers
